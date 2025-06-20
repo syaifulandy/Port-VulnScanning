@@ -1,0 +1,3 @@
+Input file ada 2:
+1. cidrs.txt : berisi list cidr yang mau discan
+2. ports.txt : list port yang mau discan
