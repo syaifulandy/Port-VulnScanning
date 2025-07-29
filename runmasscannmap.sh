@@ -1,27 +1,26 @@
 #!/bin/bash
 set -e
-#Masscan: scanning TCP ports from ports.txt
-#NMAP: scanning UDP ports
 
 PORT_FILE="ports.txt"
 UDP_PORTS="53,123,161,162"
+CIDR_DIR="cidr"
 OUTPUT_DIR="output"
 RATE=10000
-
-CIDR_FOLDER="cidr"
-CIDR_FILES=( "$CIDR_FOLDER"/*.txt )
-
-# Validasi input
-[[ ! -f "$PORT_FILE" ]] && echo "❌ File $PORT_FILE tidak ditemukan!" && exit 1
-for file in "${CIDR_FILES[@]}"; do
-  [[ ! -f "$file" ]] && echo "❌ File $file tidak ditemukan!" && exit 1
-done
 
 mkdir -p "$OUTPUT_DIR"
 ALL_UNIQUE_TCP="$OUTPUT_DIR/all_unique_tcp.txt"
 ALL_UNIQUE_UDP="$OUTPUT_DIR/all_unique_udp.txt"
 > "$ALL_UNIQUE_TCP"
 > "$ALL_UNIQUE_UDP"
+
+# Ambil file CIDR dari folder
+CIDR_FILES=("$CIDR_DIR"/*.txt)
+
+# Validasi input
+[[ ! -f "$PORT_FILE" ]] && echo "❌ File $PORT_FILE tidak ditemukan!" && exit 1
+for file in "${CIDR_FILES[@]}"; do
+  [[ ! -f "$file" ]] && echo "❌ File $file tidak ditemukan!" && exit 1
+done
 
 # Ambil port TCP valid
 PORT_LIST=$(tr ', ' '\n' < "$PORT_FILE" | grep -E '^[0-9]+$' | sort -nu | paste -sd "," -)
@@ -34,12 +33,14 @@ for CIDR_FILE in "${CIDR_FILES[@]}"; do
   [[ ! -s "$CIDR_FILE" ]] && echo "⚠️  $CIDR_FILE kosong, dilewati!" && continue
 
   name=$(basename "$CIDR_FILE" .txt)
-  tcp_out_file="$OUTPUT_DIR/output_tcp_$name.txt"
-  udp_out_file="$OUTPUT_DIR/output_udp_$name.txt"
-  > "$tcp_out_file"
-  > "$udp_out_file"
 
+  start_time=$(date +%s)
   echo "🚀 Memproses $CIDR_FILE..."
+
+  tcp_out_file=$(mktemp)
+  udp_out_file=$(mktemp)
+
+  # TCP Scan
   while read -r cidr; do
     [[ -z "$cidr" ]] && continue
     echo "▶️ [TCP] Scanning $cidr"
@@ -48,8 +49,8 @@ for CIDR_FILE in "${CIDR_FILES[@]}"; do
   done < "$CIDR_FILE"
 
   sort -u "$tcp_out_file" -o "$tcp_out_file"
-  cat "$tcp_out_file" >> "$ALL_UNIQUE_TCP"
 
+  # UDP Scan
   echo "▶️ [UDP] Nmap scan $CIDR_FILE..."
   sudo nmap -sU -p "$UDP_PORTS" -iL "$CIDR_FILE" -oG - > temp_nmap.gnmap
 
@@ -74,25 +75,32 @@ for CIDR_FILE in "${CIDR_FILES[@]}"; do
         print ip ":" pinfo[1]
       }
     }
-  }
-  ' temp_nmap.gnmap >> "$udp_out_file"
-
-
+  }' temp_nmap.gnmap >> "$udp_out_file"
 
   sort -u "$udp_out_file" -o "$udp_out_file"
-  cat "$udp_out_file" >> "$ALL_UNIQUE_UDP"
+  rm -f temp_nmap.gnmap
+
+  end_time=$(date +%s)
+  duration_sec=$((end_time - start_time))
+  duration_min=$(( (duration_sec + 59) / 60 ))
+
+  start_fmt=$(date -d "@$start_time" +"%Y%m%dT%H%M")
+  end_fmt=$(date -d "@$end_time" +"%Y%m%dT%H%M")
+  name_with_time="${name}_start_${start_fmt}_end_${end_fmt}_${duration_min}min"
+
+  tcp_final="$OUTPUT_DIR/tcp_${name_with_time}.txt"
+  udp_final="$OUTPUT_DIR/udp_${name_with_time}.txt"
+
+  mv "$tcp_out_file" "$tcp_final"
+  mv "$udp_out_file" "$udp_final"
+
+  cat "$tcp_final" >> "$ALL_UNIQUE_TCP"
+  cat "$udp_final" >> "$ALL_UNIQUE_UDP"
 done
 
 sort -u "$ALL_UNIQUE_TCP" -o "$ALL_UNIQUE_TCP"
 sort -u "$ALL_UNIQUE_UDP" -o "$ALL_UNIQUE_UDP"
-rm -f temp_nmap.gnmap
 
 echo "✅ Scanning selesai!"
 echo "📄 TCP hasil gabungan: $ALL_UNIQUE_TCP"
 echo "📄 UDP hasil gabungan: $ALL_UNIQUE_UDP"
-
-# Jalankan konversi hasil ke CSV
-echo "🛠️ Konversi hasil ke CSV..."
-./convertmasscantocsv.sh "$ALL_UNIQUE_TCP"
-./convertnmapscantocsvperip.sh "$ALL_UNIQUE_UDP"
-echo "✅ Konversi selesai!"
