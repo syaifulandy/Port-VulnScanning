@@ -101,6 +101,15 @@ done
 sort -u "$ALL_UNIQUE_TCP" -o "$ALL_UNIQUE_TCP"
 sort -u "$ALL_UNIQUE_UDP" -o "$ALL_UNIQUE_UDP"
 
+# Ambil timestamp sekarang untuk nama ZIP
+zip_time=$(date +"%Y%m%dT%H%M")
+zip_name="${OUTPUT_DIR}_${zip_time}.zip"
+
+# Buat ZIP hasil output
+zip -r "$zip_name" "$OUTPUT_DIR"
+
 echo "✅ Scanning selesai!"
 echo "📄 TCP hasil gabungan: $ALL_UNIQUE_TCP"
 echo "📄 UDP hasil gabungan: $ALL_UNIQUE_UDP"
+echo "🗜️ Arsip ZIP dibuat: $zip_name"
+
