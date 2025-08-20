@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PORT_FILE="ports.txt"
+PORT_FILE="./ports.txt"
 UDP_PORTS="53,123,161,162"
 CIDR_DIR="cidr"
 OUTPUT_DIR="output"
