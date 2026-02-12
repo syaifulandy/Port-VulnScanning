@@ -3,7 +3,7 @@
 INPUT_FILE="domains.txt"
 OUTPUT_FILE="ssl_report.csv"
 PARALLEL=2
-TIMEOUT=10
+TIMEOUT=5
 
 # =========================
 # PRECHECK
